@@ -1,3 +1,4 @@
+# components/document_loader.py
 import os
 import fitz  # PyMuPDF
 import docx

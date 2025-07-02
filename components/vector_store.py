@@ -1,3 +1,4 @@
+# components/vector_store.py
 import os
 import faiss
 import pickle
