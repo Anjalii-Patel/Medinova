@@ -1,0 +1,153 @@
+:root {
+  --primary: #2563eb;
+  --primary-dark: #1e40af;
+  --secondary: #10b981;
+  --secondary-dark: #059669;
+  --background: #f3f4f6;
+  --card-bg: #ffffff;
+  --text-dark: #111827;
+  --text-muted: #6b7280;
+  --border: #e5e7eb;
+  --radius: 12px;
+  --shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background-color: var(--background);
+  display: flex;
+  height: 100vh;
+}
+
+/* Sidebar */
+#sidebar {
+  width: 240px;
+  background: var(--card-bg);
+  border-right: 1px solid var(--border);
+  padding: 20px;
+  overflow-y: auto;
+}
+
+#sidebar button {
+  width: 100%;
+  padding: 12px;
+  background: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius);
+  cursor: pointer;
+  margin-bottom: 16px;
+  font-size: 16px;
+}
+
+#sidebar button:hover {
+  background: var(--primary-dark);
+}
+
+#chatHistory div {
+  padding: 10px;
+  margin-bottom: 5px;
+  border-radius: var(--radius);
+  cursor: pointer;
+  background: #f9fafb;
+}
+
+#chatHistory div:hover {
+  background: #e5e7eb;
+}
+
+/* Chat container */
+#chat-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+}
+
+h1 {
+  margin: 0 0 20px;
+  font-size: 28px;
+  color: var(--text-dark);
+}
+
+#chat-box {
+  flex-grow: 1;
+  overflow-y: auto;
+  background: var(--card-bg);
+  padding: 20px;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 20px;
+}
+
+.message {
+  margin-bottom: 15px;
+  padding: 12px 16px;
+  border-radius: var(--radius);
+  max-width: 80%;
+  word-wrap: break-word;
+}
+
+.user {
+  align-self: flex-end;
+  background: #dbeafe;
+  color: var(--text-dark);
+}
+
+.bot {
+  align-self: flex-start;
+  background: #d1fae5;
+  color: var(--text-dark);
+}
+
+/* Controls */
+#controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  max-width: 800px;
+}
+
+input[type="text"],
+input[type="file"] {
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 15px;
+}
+
+button {
+  padding: 10px 16px;
+  border: none;
+  background: var(--primary);
+  color: white;
+  border-radius: var(--radius);
+  cursor: pointer;
+  font-size: 15px;
+}
+
+button:hover {
+  background: var(--primary-dark);
+}
+
+.mic-button {
+  background: var(--secondary);
+}
+
+.mic-button:hover {
+  background: var(--secondary-dark);
+}
+
+.status {
+  grid-column: span 2;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+#live-transcript {
+  grid-column: span 2;
+  font-style: italic;
+  color: var(--text-muted);
+}

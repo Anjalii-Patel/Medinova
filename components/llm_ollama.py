@@ -1,7 +1,7 @@
 # components/llm_ollama.py
 import requests
 
-def query_ollama(prompt: str, model="mistral"):
+def query_ollama(prompt: str, model="llama3.2:3b"):
     url = "http://localhost:11434/api/chat"
     payload = {
         "model": model,
