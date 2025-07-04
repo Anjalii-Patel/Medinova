@@ -1,3 +1,4 @@
+// frontend/app.js
 const chatBox = document.getElementById("chat-box");
 const transcriptDisplay = document.getElementById("partialTranscript");
 
@@ -64,7 +65,9 @@ async function ask(inputText = null) {
 let socket, mediaRecorder, micOn = false, lastTranscript = "", debounceTimeout;
 
 async function toggleMic() {
+  const micIcon = document.getElementById("micIcon");
   if (!micOn) {
+    micIcon.className = "fas fa-microphone";
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     socket = new WebSocket("ws://localhost:8000/ws/asr");
 
@@ -96,6 +99,7 @@ async function toggleMic() {
     transcriptDisplay.innerText = "...";
 
   } else {
+    micIcon.className = "fas fa-microphone-slash";
     mediaRecorder.stop();
     socket.close();
     micOn = false;

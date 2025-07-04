@@ -17,7 +17,12 @@ class BotState(TypedDict, total=False):
 
 def load_memory(state: BotState) -> BotState:
     sid = state.get("session_id", "default")
-    state["memory"] = get_memory(sid)
+    memory = get_memory(sid)
+
+    # Reset memory if it's a new session
+    if memory is None or not isinstance(memory, dict):
+        memory = {"symptoms": [], "duration": None, "triggers": None}
+    state["memory"] = memory
     return state
 
 def retrieve_chunks(state: BotState) -> BotState:
@@ -72,18 +77,19 @@ def update_memory(state: BotState) -> BotState:
     return state
 
 def build_medical_prompt(symptoms, input_text, docs):
-    doc_context = "\n".join(docs)
+    doc_context = "\n".join(docs) if docs else "No uploaded documents yet."
     return f"""
-You are a medical assistant. Based on the user's input and known symptoms, provide a possible explanation, ask relevant follow-up questions, and refer to the context if useful.
+        You are a helpful **medical assistant**. Respond only to medically relevant queries.
+        Ignore unrelated topics.
+        
+        Known symptoms: {', '.join(symptoms) or 'None'}
+        User said: "{input_text}"
 
-Known symptoms: {', '.join(symptoms) if symptoms else 'None yet'}
-User just said: "{input_text}"
+        Relevant document context:
+        {doc_context}
 
-Context from medical docs:
-{doc_context}
-
-Now, respond conversationally and ask any necessary follow-up questions.
-"""
+        Respond conversationally, medically, and ask follow-up questions if needed.
+        """
 
 def build_graph() -> Runnable:
     graph = StateGraph(BotState)

@@ -54,16 +54,22 @@ async def ask(question: str = Form(...), session_id: str = Form("default")):
     if not os.path.exists("vector_store/faiss_index") or not os.path.exists("vector_store/metadata.pkl"):
         return {"error": "Please upload a document before asking questions."}
 
+    # Fresh memory creation if session is new
+    memory_path = os.path.join(MEMORY_FOLDER, f"session_{session_id}.json")
+    if not os.path.exists(memory_path):
+        with open(memory_path, "w") as f:
+            json.dump({
+                "session_id": session_id,
+                "created": str(datetime.now()),
+                "messages": []
+            }, f)
+
     result = graph.invoke({"input": question, "session_id": session_id})
     response_text = result["response"]
 
-    # Save to memory
-    memory_path = os.path.join(MEMORY_FOLDER, f"session_{session_id}.json")
-    if os.path.exists(memory_path):
-        with open(memory_path, "r") as f:
-            history = json.load(f)
-    else:
-        history = {"session_id": session_id, "created": str(datetime.now()), "messages": []}
+    # Append messages
+    with open(memory_path, "r") as f:
+        history = json.load(f)
     history["messages"].append({"role": "user", "text": question})
     history["messages"].append({"role": "bot", "text": response_text})
     with open(memory_path, "w") as f:
