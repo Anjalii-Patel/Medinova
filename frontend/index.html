@@ -1,49 +1,187 @@
+<!-- frontend/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Medinova Assistant</title>
+  <title>Medinova Chatbot</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #f3f4f6;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    h1 {
+      margin-top: 20px;
+      color: #333;
+    }
+
+    #chat-box {
+      width: 80%;
+      max-width: 600px;
+      background: white;
+      border-radius: 10px;
+      padding: 15px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      overflow-y: auto;
+      height: 400px;
+      margin-top: 20px;
+    }
+
+    .message {
+      margin: 10px 0;
+    }
+
+    .user { color: #1d4ed8; }
+    .bot  { color: #059669; }
+
+    #controls {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    input[type="text"], input[type="file"] {
+      width: 100%;
+      max-width: 400px;
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+    }
+
+    button {
+      padding: 10px 20px;
+      border: none;
+      background: #2563eb;
+      color: white;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1e40af;
+    }
+
+    .mic-button {
+      background: #10b981;
+    }
+
+    .mic-button:hover {
+      background: #059669;
+    }
+
+    .status {
+      font-size: 14px;
+      color: #555;
+    }
+  </style>
 </head>
 <body>
-  <h2>Upload Medical Document</h2>
-  <input type="file" id="docFile" />
-  <button onclick="uploadDoc()">Upload</button>
-  <p id="uploadStatus"></p>
 
-  <hr />
+  <h1>Medinova Chatbot</h1>
 
-  <h2>Ask a Medical Question</h2>
-  <input type="text" id="questionInput" size="60" />
-  <button onclick="ask()">Ask</button>
-  <p><strong>Response:</strong> <span id="response"></span></p>
+  <div id="chat-box"></div>
+
+  <div id="controls">
+    <input type="file" id="docFile" />
+    <button onclick="uploadDoc()">Upload Medical Document</button>
+    <p class="status" id="uploadStatus"></p>
+
+    <input type="text" id="question" placeholder="Type your medical query..." />
+    <input type="text" id="session_id" placeholder="Session ID" value="default" />
+    <button onclick="ask()">Ask</button>
+
+    <button class="mic-button" onclick="toggleMic()">Start / Stop Mic</button>
+    <p class="status" id="micStatus">Mic is OFF</p>
+  </div>
 
   <script>
+    const chatBox = document.getElementById("chat-box");
+
+    function appendMessage(sender, text) {
+      const div = document.createElement("div");
+      div.className = "message " + sender;
+      div.innerText = `${sender === "user" ? "You" : "Bot"}: ${text}`;
+      chatBox.appendChild(div);
+      chatBox.scrollTop = chatBox.scrollHeight;
+    }
+
     async function uploadDoc() {
       const file = document.getElementById("docFile").files[0];
       const formData = new FormData();
       formData.append("file", file);
-
-      const res = await fetch("/upload", {
-        method: "POST",
-        body: formData
-      });
-
+      const res = await fetch("/upload", { method: "POST", body: formData });
       const data = await res.json();
       document.getElementById("uploadStatus").innerText = data.status;
     }
 
     async function ask() {
-      const question = document.getElementById("questionInput").value;
+      const question = document.getElementById("question").value;
+      const session = document.getElementById("session_id").value;
+      if (!question.trim()) return;
+      appendMessage("user", question);
+
       const formData = new FormData();
       formData.append("question", question);
-
-      const res = await fetch("/ask", {
-        method: "POST",
-        body: formData
-      });
-
+      formData.append("session_id", session);
+      const res = await fetch("/ask", { method: "POST", body: formData });
       const data = await res.json();
-      document.getElementById("response").innerText = data.response;
+      appendMessage("bot", data.response);
+    }
+
+    // 🎤 WebSocket-based real-time audio streaming
+    let socket;
+    let mediaRecorder;
+    let micOn = false;
+
+    async function toggleMic() {
+      if (!micOn) {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        socket = new WebSocket("ws://localhost:8000/ws/asr");
+
+        socket.onopen = () => {
+          console.log("WebSocket connected");
+        };
+
+        socket.onclose = () => {
+          console.log("WebSocket disconnected");
+        };
+
+        socket.onmessage = (event) => {
+          const transcribed = event.data;
+          document.getElementById("question").value = transcribed;
+          appendMessage("bot", transcript); 
+        };
+
+        mediaRecorder = new MediaRecorder(stream, { mimeType: "audio/webm" });
+        mediaRecorder.ondataavailable = async (e) => {
+          if (e.data.size > 0 && socket.readyState === WebSocket.OPEN) {
+            const arrayBuffer = await e.data.arrayBuffer();
+            socket.send(arrayBuffer);
+          }
+        };
+
+        mediaRecorder.start(250); // send every 250ms
+        micOn = true;
+        document.getElementById("micStatus").innerText = "Mic is ON and streaming...";
+      } else {
+        mediaRecorder.stop();
+        socket.close();
+        micOn = false;
+        document.getElementById("micStatus").innerText = "Mic is OFF";
+
+        // Auto-submit final question
+        const question = document.getElementById("question").value;
+        if (question.trim()) {
+          ask();
+        }
+      }
     }
   </script>
 </body>

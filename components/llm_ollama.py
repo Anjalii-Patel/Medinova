@@ -1,3 +1,4 @@
+# components/llm_ollama.py
 import requests
 
 def query_ollama(prompt: str, model="mistral"):

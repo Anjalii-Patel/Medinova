@@ -14,17 +14,27 @@ embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 def embed_chunks(chunks: List[str]) -> List[List[float]]:
     return embedding_model.encode(chunks, show_progress_bar=True)
 
-def save_faiss_index(embeddings, chunks):
-    dim = len(embeddings[0])
-    index = faiss.IndexFlatL2(dim)
-    index.add(embeddings)
+def save_faiss_index(new_embeddings, new_chunks):
+    dim = len(new_embeddings[0])
+
+    # Load existing index/chunks if available
+    if os.path.exists(VECTOR_STORE_PATH):
+        index = faiss.read_index(VECTOR_STORE_PATH)
+        with open(METADATA_PATH, "rb") as f:
+            old_chunks = pickle.load(f)
+        all_chunks = old_chunks + new_chunks
+    else:
+        index = faiss.IndexFlatL2(dim)
+        all_chunks = new_chunks
+
+    index.add(new_embeddings)
+
+    # Save updated index and metadata
     faiss.write_index(index, VECTOR_STORE_PATH)
-
-    # Save metadata (chunks) for later use
     with open(METADATA_PATH, "wb") as f:
-        pickle.dump(chunks, f)
+        pickle.dump(all_chunks, f)
 
-    print("FAISS index and metadata saved.")
+    print("FAISS index updated with new document.")
 
 def load_faiss_index():
     if not os.path.exists(VECTOR_STORE_PATH):

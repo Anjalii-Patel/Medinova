@@ -1,43 +1,36 @@
+# agent/graph_builder.py
 from langgraph.graph import StateGraph
 from langchain_core.runnables import Runnable
 from typing import Dict, List, Optional, TypedDict
 from components.vector_store import query_faiss
 from components.llm_ollama import query_ollama
+from components.memory_store import get_memory, save_memory
 import re
 
-# --- Step 1: Define the state schema ---
-class MemoryState(TypedDict, total=False):
-    symptoms: List[str]
-    duration: Optional[str]
-    triggers: Optional[str]
-
 class BotState(TypedDict, total=False):
+    session_id: str
     input: str
-    memory: MemoryState
+    memory: dict
     docs: List[str]
     response: str
     followup_required: bool
 
-# --- Step 2: Node implementations ---
-
 def load_memory(state: BotState) -> BotState:
-    state.setdefault("memory", {"symptoms": [], "duration": None, "triggers": None})
+    sid = state.get("session_id", "default")
+    state["memory"] = get_memory(sid)
     return state
 
 def retrieve_chunks(state: BotState) -> BotState:
-    user_query = state["input"]
-    docs = query_faiss(user_query)
-    state["docs"] = docs
+    state["docs"] = query_faiss(state["input"])
     return state
 
 def query_llm(state: BotState) -> BotState:
     prompt = build_medical_prompt(
-        symptoms=state["memory"]["symptoms"],
-        input_text=state["input"],
-        docs=state["docs"]
+        state["memory"]["symptoms"],
+        state["input"],
+        state["docs"]
     )
-    response = query_ollama(prompt)
-    state["response"] = response
+    state["response"] = query_ollama(prompt)
     return state
 
 def decide_followup(state: BotState) -> BotState:
@@ -58,28 +51,26 @@ def decide_followup(state: BotState) -> BotState:
     return state
 
 def update_memory(state: BotState) -> BotState:
-    input_text = state["input"]
+    text = state["input"]
     mem = state["memory"]
 
-    # Simple pattern match for duration
-    duration_match = re.search(r"(for|since)\s+(\d+\s+\w+)", input_text.lower())
-    if duration_match:
-        mem["duration"] = duration_match.group(2)
+    match = re.search(r"(for|since)\s+(\d+\s+\w+)", text.lower())
+    if match:
+        mem["duration"] = match.group(2)
 
-    # Basic keyword matching for triggers
     for word in ["walking", "running", "exercise", "cold", "dust"]:
-        if word in input_text.lower():
+        if word in text.lower():
             mem["triggers"] = word
             break
 
-    # Add current input to symptoms
-    if input_text not in mem["symptoms"]:
-        mem["symptoms"].append(input_text)
+    if text not in mem["symptoms"]:
+        mem["symptoms"].append(text)
 
+    # Save to Redis
+    save_memory(state.get("session_id", "default"), mem)
     state["memory"] = mem
     return state
 
-# --- Helper for prompt building ---
 def build_medical_prompt(symptoms, input_text, docs):
     doc_context = "\n".join(docs)
     return f"""
@@ -94,10 +85,8 @@ Context from medical docs:
 Now, respond conversationally and ask any necessary follow-up questions.
 """
 
-# --- Graph Builder ---
 def build_graph() -> Runnable:
     graph = StateGraph(BotState)
-
     graph.add_node("load_memory", load_memory)
     graph.add_node("retrieve", retrieve_chunks)
     graph.add_node("llm", query_llm)

@@ -1,6 +1,6 @@
 # components/document_loader.py
 import os
-import fitz  # PyMuPDF
+import fitz
 import docx
 from typing import List
 
