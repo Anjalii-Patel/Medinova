@@ -2,6 +2,11 @@
 const chatBox = document.getElementById("chat-box");
 const transcriptDisplay = document.getElementById("partialTranscript");
 
+// Initialize session
+let sessionId = localStorage.getItem("session_id") || `sess_${Date.now()}`;
+localStorage.setItem("session_id", sessionId);
+document.getElementById("session_id").value = sessionId;
+
 function appendMessage(sender, text) {
   const div = document.createElement("div");
   div.className = "message " + sender;
@@ -27,7 +32,6 @@ async function uploadDoc() {
 
 async function ask(inputText = null) {
   const questionInput = document.getElementById("question");
-  const session = document.getElementById("session_id").value;
   const question = inputText || questionInput.value.trim();
   if (!question) return;
 
@@ -43,20 +47,17 @@ async function ask(inputText = null) {
 
   const formData = new FormData();
   formData.append("question", question);
-  formData.append("session_id", session);
+  formData.append("session_id", sessionId);
 
   try {
     const res = await fetch("/ask", { method: "POST", body: formData });
     const data = await res.json();
 
-    const indicator = document.getElementById("typing-indicator");
-    if (indicator) indicator.remove();
-
+    document.getElementById("typing-indicator").remove();
     appendMessage("bot", data.response || "No response.");
+    saveToHistory(question, data.response);
   } catch (err) {
-    const indicator = document.getElementById("typing-indicator");
-    if (indicator) indicator.remove();
-
+    document.getElementById("typing-indicator").remove();
     appendMessage("bot", "Error connecting to backend.");
     console.error("[ask] Error:", err);
   }
@@ -134,8 +135,11 @@ async function loadChatHistory() {
   }
 }
 
-async function loadChat(sessionId) {
+async function loadChat(id) {
+  sessionId = id;
+  localStorage.setItem("session_id", sessionId);
   document.getElementById("session_id").value = sessionId;
+
   try {
     const res = await fetch(`/chat/${sessionId}`);
     const data = await res.json();
@@ -147,10 +151,20 @@ async function loadChat(sessionId) {
 }
 
 function startNewChat() {
-  const newSessionId = `sess_${Date.now()}`;
-  document.getElementById("session_id").value = newSessionId;
+  sessionId = `sess_${Date.now()}`;
+  localStorage.setItem("session_id", sessionId);
+  document.getElementById("session_id").value = sessionId;
   chatBox.innerHTML = "";
   appendMessage("bot", "New chat started. Ask your question!");
+  loadChatHistory();
 }
 
-window.onload = loadChatHistory;
+// Optional: store chat locally if no backend persistence
+function saveToHistory(userMsg, botMsg) {
+  // Hook for future enhancement
+}
+
+window.onload = () => {
+  loadChatHistory();
+  document.getElementById("session_id").value = sessionId;
+};

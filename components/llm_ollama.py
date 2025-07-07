@@ -1,7 +1,7 @@
 # components/llm_ollama.py
 import requests
 
-def query_ollama(prompt: str, model="llama3.2:3b"):
+def query_ollama(prompt: str, model="llama3.2:1b"):
     url = "http://localhost:11434/api/chat"
     payload = {
         "model": model,
@@ -10,18 +10,25 @@ def query_ollama(prompt: str, model="llama3.2:3b"):
         ],
         "stream": False
     }
-    response = requests.post(url, json=payload)
-    data = response.json()
-    # Check for a valid assistant response
-    if (
-        "message" in data and
-        isinstance(data["message"], dict) and
-        "content" in data["message"] and
-        data["message"]["content"].strip() != ""
-    ):
-        return data["message"]["content"].strip()
-    elif "done_reason" in data and data["done_reason"] == "load":
-        return "[Model loaded, please ask your question again.]"
-    else:
-        print("Unexpected response from Ollama API:", data)
-        return "[Error: Unexpected response format or empty response from Ollama API]"
+
+    print("[Query Ollama] Debugging information:", payload)
+
+    try:
+        response = requests.post(url, json=payload)
+        data = response.json()
+
+        print("\n==== RAW RESPONSE FROM OLLAMA ====")
+        print(data)
+
+        content = data.get("message", {}).get("content", "").strip()
+
+        if content:
+            return content
+        elif data.get("done_reason") == "load":
+            return "[Model is now loaded, please ask your question again.]"
+        else:
+            return "[No valid response from model. Try rephrasing your question.]"
+
+    except Exception as e:
+        print("[query_ollama] Exception:", e)
+        return "Sorry, something went wrong while processing your request."

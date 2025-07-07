@@ -37,9 +37,10 @@ def save_faiss_index(new_embeddings, new_chunks):
     print("FAISS index updated with new document.")
 
 def load_faiss_index():
-    if not os.path.exists(VECTOR_STORE_PATH):
-        raise ValueError("Index not found!")
-    
+    if not os.path.exists(VECTOR_STORE_PATH) or not os.path.exists(METADATA_PATH):
+        print("[load_faiss_index] No FAISS index found. Returning empty context.")
+        return None, []
+
     index = faiss.read_index(VECTOR_STORE_PATH)
     with open(METADATA_PATH, "rb") as f:
         chunks = pickle.load(f)
@@ -48,5 +49,10 @@ def load_faiss_index():
 def query_faiss(query: str, k: int = 3):
     query_embedding = embedding_model.encode([query])
     index, chunks = load_faiss_index()
+    
+    if index is None:
+        print("[query_faiss] Empty index, skipping vector search.")
+        return []
+
     scores, indices = index.search(query_embedding, k)
     return [chunks[i] for i in indices[0]]

@@ -35,6 +35,7 @@ def query_llm(state: BotState) -> BotState:
         state["input"],
         state["docs"]
     )
+    print("[Query LLM] Prompt:\n", prompt)
     state["response"] = query_ollama(prompt)
     return state
 
@@ -77,18 +78,19 @@ def update_memory(state: BotState) -> BotState:
     return state
 
 def build_medical_prompt(symptoms, input_text, docs):
-    doc_context = "\n".join(docs) if docs else "No uploaded documents yet."
+    doc_context = "\n".join(docs)
     return f"""
-        You are a helpful **medical assistant**. Respond only to medically relevant queries.
-        Ignore unrelated topics.
-        
-        Known symptoms: {', '.join(symptoms) or 'None'}
-        User said: "{input_text}"
+        You are a helpful and friendly medical assistant. Always respond conversationally to user inputs, even if they are greetings or introductions. 
 
-        Relevant document context:
+        If the user has not yet described symptoms, kindly ask them to provide medical concerns.
+
+        Known symptoms: {', '.join(symptoms) if symptoms else 'None yet'}
+        User just said: "{input_text}"
+
+        Context from medical docs:
         {doc_context}
 
-        Respond conversationally, medically, and ask follow-up questions if needed.
+        Respond conversationally and guide the user to describe symptoms if they haven't already.
         """
 
 def build_graph() -> Runnable:
@@ -101,9 +103,8 @@ def build_graph() -> Runnable:
 
     graph.set_entry_point("load_memory")
     graph.add_edge("load_memory", "retrieve")
-    graph.add_edge("retrieve", "llm")
-    graph.add_edge("llm", "followup_logic")
-    graph.add_edge("followup_logic", "update_memory")
-    graph.set_finish_point("update_memory")
-
+    graph.add_edge("retrieve", "update_memory")  
+    graph.add_edge("update_memory", "llm")     
+    # graph.add_edge("llm", "followup_logic")
+    graph.set_finish_point("followup_logic")
     return graph.compile()

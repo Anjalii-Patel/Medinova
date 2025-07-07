@@ -10,6 +10,7 @@ from components.asr import transcribe_audio, stream_asr
 from agents.graph_builder import build_graph
 import os, json, uuid
 from datetime import datetime
+from components.memory_store import get_memory, save_memory, list_sessions
 
 UPLOAD_FOLDER = "uploads"
 AUDIO_FOLDER = "audio"
@@ -51,29 +52,14 @@ async def upload_doc(file: UploadFile = File(...)):
 
 @app.post("/ask")
 async def ask(question: str = Form(...), session_id: str = Form("default")):
-    if not os.path.exists("vector_store/faiss_index") or not os.path.exists("vector_store/metadata.pkl"):
-        return {"error": "Please upload a document before asking questions."}
-
-    # Fresh memory creation if session is new
-    memory_path = os.path.join(MEMORY_FOLDER, f"session_{session_id}.json")
-    if not os.path.exists(memory_path):
-        with open(memory_path, "w") as f:
-            json.dump({
-                "session_id": session_id,
-                "created": str(datetime.now()),
-                "messages": []
-            }, f)
-
+    session = get_memory(session_id)
     result = graph.invoke({"input": question, "session_id": session_id})
     response_text = result["response"]
 
-    # Append messages
-    with open(memory_path, "r") as f:
-        history = json.load(f)
-    history["messages"].append({"role": "user", "text": question})
-    history["messages"].append({"role": "bot", "text": response_text})
-    with open(memory_path, "w") as f:
-        json.dump(history, f, indent=2)
+    # Update messages
+    session["messages"].append({"role": "user", "text": question})
+    session["messages"].append({"role": "bot", "text": response_text})
+    save_memory(session_id, session)
 
     return {
         "response": response_text,
@@ -82,25 +68,12 @@ async def ask(question: str = Form(...), session_id: str = Form("default")):
 
 @app.get("/chats")
 def list_chats():
-    files = [f for f in os.listdir(MEMORY_FOLDER) if f.startswith("session_")]
-    sessions = []
-    for file in sorted(files):
-        with open(os.path.join(MEMORY_FOLDER, file)) as f:
-            data = json.load(f)
-            sessions.append({
-                "session_id": data["session_id"],
-                "created": data["created"],
-                "preview": data["messages"][0]["text"] if data["messages"] else ""
-            })
-    return sessions
+    return list_sessions()
 
 @app.get("/chat/{session_id}")
 def get_chat(session_id: str):
-    path = os.path.join(MEMORY_FOLDER, f"session_{session_id}.json")
-    if not os.path.exists(path):
-        return {"error": "Session not found."}
-    with open(path) as f:
-        return json.load(f)
+    session = get_memory(session_id)
+    return {"session_id": session_id, "messages": session.get("messages", [])}
 
 @app.post("/transcribe")
 async def transcribe(file: UploadFile = File(...)):
