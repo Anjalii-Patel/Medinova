@@ -27,8 +27,14 @@ def load_memory(state: BotState) -> BotState:
 
 def retrieve_chunks(state: BotState) -> BotState:
     session_id = state.get("session_id", "default")
-    state["docs"] = query_faiss(state["input"], index_name=f"{session_id}.faiss")
-    print(f"[RETRIEVAL] Retrieved {len(state['docs'])} chunks from {session_id}.faiss")
+    question = state["input"].lower()
+
+    if any(cmd in question for cmd in ["summarize", "summarise", "explain", "analyze", "extract"]):
+        chunks = query_faiss(f"{session_id}.faiss")
+        state["docs"] = chunks
+    else:
+        state["docs"] = query_faiss(question, index_name=f"{session_id}.faiss")
+    
     return state
 
 def query_llm(state: BotState) -> BotState:
