@@ -1,3 +1,4 @@
+<!-- frontend/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,39 +9,40 @@
 </head>
 <body>
 
-  <!-- Sidebar -->
   <div id="sidebar">
     <button onclick="startNewChat()">+ New Chat</button>
     <div id="chatHistory"></div>
   </div>
 
-  <!-- Chat Container -->
   <div id="chat-container">
     <h1>Medinova Chatbot</h1>
-
     <div id="chat-box"></div>
 
     <div id="controls">
-      <input type="file" id="docFile" />
-      <button onclick="uploadDoc()">Upload</button>
+      <input type="file" id="docFile" hidden onchange="uploadDoc()" />
+      <button class="icon-button" onclick="document.getElementById('docFile').click()" title="Upload">
+        <i class="fas fa-file-upload"></i>
+      </button>
 
-      <input type="text" id="question" placeholder="Type your medical query..." />
-      <button onclick="ask()">Ask</button>
+      <input type="text" id="question" placeholder="Type your medical query... (Enter to send, Shift+Enter for newline)" />
 
-      <input type="text" id="session_id" placeholder="Session ID" />
-      <button class="mic-button" id="micToggle" onclick="toggleMic()">
+      <button class="icon-button" title="Send" id="sendButton" onclick="ask()">
+        <i class="fas fa-paper-plane" id="sendIcon"></i>
+      </button>
+
+      <button class="icon-button" id="micToggle" onclick="toggleMic()" title="Speak">
         <i id="micIcon" class="fas fa-microphone"></i>
       </button>
 
+      <input type="text" id="session_id" style="display:none;" />
+    </div>
 
+    <div id="status-area">
       <p class="status" id="uploadStatus"></p>
       <p class="status" id="micStatus">Mic is OFF</p>
-      <p id="live-transcript">Transcript: <span id="partialTranscript">...</span></p>
     </div>
   </div>
 
-  <!-- Script (inline or external) -->
   <script src="/frontend/app.js"></script>
-
 </body>
 </html>

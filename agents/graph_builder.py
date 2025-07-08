@@ -26,7 +26,9 @@ def load_memory(state: BotState) -> BotState:
     return state
 
 def retrieve_chunks(state: BotState) -> BotState:
-    state["docs"] = query_faiss(state["input"])
+    session_id = state.get("session_id", "default")
+    state["docs"] = query_faiss(state["input"], index_name=f"{session_id}.faiss")
+    print(f"[RETRIEVAL] Retrieved {len(state['docs'])} chunks from {session_id}.faiss")
     return state
 
 def query_llm(state: BotState) -> BotState:
@@ -44,7 +46,7 @@ def decide_followup(state: BotState) -> BotState:
     missing = []
 
     if not mem.get("duration"):
-        missing.append("duration")
+        missing.append("duration")   
     if not mem.get("triggers"):
         missing.append("triggers")
 
@@ -79,18 +81,30 @@ def update_memory(state: BotState) -> BotState:
 
 def build_medical_prompt(symptoms, input_text, docs):
     doc_context = "\n".join(docs)
+    known_symptoms = ', '.join(symptoms) if symptoms else 'None yet'
+
     return f"""
-        You are a helpful and friendly medical assistant. Always respond conversationally to user inputs, even if they are greetings or introductions. 
+        You are a helpful and friendly medical assistant.
 
-        If the user has not yet described symptoms, kindly ask them to provide medical concerns.
+        Always respond in a warm, conversational tone.
 
-        Known symptoms: {', '.join(symptoms) if symptoms else 'None yet'}
-        User just said: "{input_text}"
+        ---
 
-        Context from medical docs:
+        User input: "{input_text}"
+        Known symptoms: {known_symptoms}
+
+        Context from uploaded medical documents:
         {doc_context}
 
-        Respond conversationally and guide the user to describe symptoms if they haven't already.
+        ---
+
+        Instructions:
+        1. If the user's input is a **task-oriented command** like "summarize", "explain", or "extract", perform that task using the context above.
+        2. If the user greets you or says something vague (e.g., "hello", "how are you?", "I need help"), then politely ask them to describe their medical symptoms.
+        3. If the user is already describing symptoms, respond helpfully and ask relevant follow-up questions.
+        4. Never ask for symptoms unless you're sure the user hasn’t shared any and isn’t giving a task-oriented command.
+
+        Only respond based on the user input and document context. Do not make up medical information.
         """
 
 def build_graph() -> Runnable:

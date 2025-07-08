@@ -1,58 +1,59 @@
 # components/vector_store.py
-import os
 import faiss
+import os
 import pickle
-from typing import List
+import numpy as np
 from sentence_transformers import SentenceTransformer
 
-VECTOR_STORE_PATH = "vector_store/faiss_index"
-METADATA_PATH = "vector_store/metadata.pkl"
+INDEX_FOLDER = "vector_store"
+os.makedirs(INDEX_FOLDER, exist_ok=True)
 
-# Load or initialize embedding model
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+def save_faiss_index(new_embeddings, new_chunks, index_name="default.faiss"):
+    index_path = os.path.join(INDEX_FOLDER, index_name)
+    chunks_path = index_path + ".pkl"
 
-def embed_chunks(chunks: List[str]) -> List[List[float]]:
-    return embedding_model.encode(chunks, show_progress_bar=True)
-
-def save_faiss_index(new_embeddings, new_chunks):
     dim = len(new_embeddings[0])
-
-    # Load existing index/chunks if available
-    if os.path.exists(VECTOR_STORE_PATH):
-        index = faiss.read_index(VECTOR_STORE_PATH)
-        with open(METADATA_PATH, "rb") as f:
-            old_chunks = pickle.load(f)
-        all_chunks = old_chunks + new_chunks
+    if os.path.exists(index_path) and os.path.exists(chunks_path):
+        # Load existing
+        existing_index = faiss.read_index(index_path)
+        with open(chunks_path, "rb") as f:
+            existing_chunks = pickle.load(f)
+        
+        # Merge
+        existing_index.add(new_embeddings)
+        all_chunks = existing_chunks + new_chunks
     else:
-        index = faiss.IndexFlatL2(dim)
+        # Create new
+        existing_index = faiss.IndexFlatL2(dim)
+        existing_index.add(new_embeddings)
         all_chunks = new_chunks
 
-    index.add(new_embeddings)
-
-    # Save updated index and metadata
-    faiss.write_index(index, VECTOR_STORE_PATH)
-    with open(METADATA_PATH, "wb") as f:
+    # Save updated
+    faiss.write_index(existing_index, index_path)
+    with open(chunks_path, "wb") as f:
         pickle.dump(all_chunks, f)
 
-    print("FAISS index updated with new document.")
-
-def load_faiss_index():
-    if not os.path.exists(VECTOR_STORE_PATH) or not os.path.exists(METADATA_PATH):
-        print("[load_faiss_index] No FAISS index found. Returning empty context.")
+def load_faiss_index(index_name="default.faiss"):
+    index_path = os.path.join(INDEX_FOLDER, index_name)
+    if not os.path.exists(index_path):
         return None, []
 
-    index = faiss.read_index(VECTOR_STORE_PATH)
-    with open(METADATA_PATH, "rb") as f:
+    faiss_index = faiss.read_index(index_path)
+    with open(index_path + ".pkl", "rb") as f:
         chunks = pickle.load(f)
-    return index, chunks
+    return faiss_index, chunks
 
-def query_faiss(query: str, k: int = 3):
-    query_embedding = embedding_model.encode([query])
-    index, chunks = load_faiss_index()
-    
-    if index is None:
-        print("[query_faiss] Empty index, skipping vector search.")
+def query_faiss(query, index_name="default.faiss", top_k=3):
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    query_vec = model.encode([query])
+    index, chunks = load_faiss_index(index_name)
+    if not index:
         return []
 
-    scores, indices = index.search(query_embedding, k)
-    return [chunks[i] for i in indices[0]]
+    D, I = index.search(query_vec, top_k)
+    return [chunks[i] for i in I[0] if i < len(chunks)]
+
+def embed_chunks(chunks):
+    model = SentenceTransformer("all-MiniLM-L6-v2")
+    embeddings = model.encode(chunks, convert_to_numpy=True, show_progress_bar=False)
+    return np.array(embeddings).astype("float32")
