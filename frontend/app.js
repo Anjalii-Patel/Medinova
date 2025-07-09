@@ -1,7 +1,8 @@
 // frontend/app.js
 const chatBox = document.getElementById("chat-box");
+const uploadedDocsContainer = document.getElementById("uploaded-documents");
 
-// Session handling
+// Load or create session ID
 let sessionId = localStorage.getItem("session_id") || `sess_${Date.now()}`;
 localStorage.setItem("session_id", sessionId);
 document.getElementById("session_id").value = sessionId;
@@ -17,15 +18,53 @@ function appendMessage(sender, text) {
 async function uploadDoc() {
   const file = document.getElementById("docFile").files[0];
   if (!file) return;
+
   const formData = new FormData();
   formData.append("file", file);
+  formData.append("session_id", sessionId);
+
+  document.getElementById("uploadStatus").innerText = "Uploading...";
+
   try {
     const res = await fetch("/upload", { method: "POST", body: formData });
+
+    if (!res.ok) {
+      const err = await res.json();
+      document.getElementById("uploadStatus").innerText = (err.detail || "Upload failed.");
+      return;
+    }
+
     const data = await res.json();
     document.getElementById("uploadStatus").innerText = data.status;
-  } catch {
+    await loadDocuments();
+  } catch (err) {
     document.getElementById("uploadStatus").innerText = "Upload failed.";
+    console.error(err);
   }
+}
+
+async function loadDocuments() {
+  try {
+    const res = await fetch(`/documents/${sessionId}`);
+    const docs = await res.json();
+    uploadedDocsContainer.innerHTML = docs.map(doc => `
+      <div class="doc-entry">
+        <span>${doc}</span>
+        <i class="fas fa-trash" onclick="deleteDocument('${doc}')"></i>
+      </div>
+    `).join('');
+  } catch {
+    uploadedDocsContainer.innerHTML = '<p class="status">Failed to load documents.</p>';
+  }
+}
+
+async function deleteDocument(docName) {
+  const res = await fetch(`/delete_doc`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId, doc_name: docName })
+  });
+  if (res.ok) await loadDocuments();
 }
 
 let isBotProcessing = false;
@@ -76,7 +115,9 @@ async function ask(inputText = null) {
   }
 }
 
+// ===================== MIC & ASR =====================
 let socket, mediaRecorder, micOn = false, lastTranscript = "", debounceTimeout;
+
 function toggleMic() {
   const micBtn = document.getElementById("micToggle");
   const micIcon = document.getElementById("micIcon");
@@ -122,6 +163,7 @@ function toggleMic() {
   });
 }
 
+// ===================== CHAT SESSIONS =====================
 async function loadChatHistory() {
   try {
     const res = await fetch("/chats");
@@ -130,12 +172,30 @@ async function loadChatHistory() {
     container.innerHTML = "";
     chats.forEach(c => {
       const div = document.createElement("div");
+      div.classList.add("chat-item");
       div.textContent = c.preview || c.session_id;
       div.onclick = () => loadChat(c.session_id);
+
+      const del = document.createElement("span");
+      del.className = "delete-chat";
+      del.textContent = "❌";
+      del.onclick = (e) => {
+        e.stopPropagation();
+        deleteChat(c.session_id);
+      };
+      div.appendChild(del);
       container.appendChild(div);
     });
   } catch {
     console.error("Failed loading chats");
+  }
+}
+
+async function deleteChat(id) {
+  const res = await fetch(`/delete_session/${id}`, { method: "DELETE" });
+  if (res.ok) {
+    if (id === sessionId) startNewChat();
+    await loadChatHistory();
   }
 }
 
@@ -144,10 +204,13 @@ async function loadChat(id) {
   localStorage.setItem("session_id", id);
   document.getElementById("session_id").value = id;
   chatBox.innerHTML = "";
+
   try {
     const res = await fetch(`/chat/${sessionId}`);
     const d = await res.json();
+
     d.messages.forEach(m => appendMessage(m.role, m.text));
+    await loadDocuments();
   } catch {
     console.error("Load chat failed");
   }
@@ -158,13 +221,16 @@ function startNewChat() {
   localStorage.setItem("session_id", sessionId);
   document.getElementById("session_id").value = sessionId;
   chatBox.innerHTML = "";
+  uploadedDocsContainer.innerHTML = "";
   appendMessage("bot", "New chat started. Ask your question!");
   loadChatHistory();
 }
 
 window.onload = () => {
   loadChatHistory();
+  loadChat(sessionId);  // <- restore last session
   document.getElementById("session_id").value = sessionId;
+
   document.getElementById("question").addEventListener("keydown", function(e) {
     if (e.key === "Enter" && !e.shiftKey && !isBotProcessing) {
       e.preventDefault();

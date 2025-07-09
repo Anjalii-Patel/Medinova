@@ -1,4 +1,4 @@
-# agent/graph_builder.py
+# agents/graph_builder.py
 from langgraph.graph import StateGraph
 from langchain_core.runnables import Runnable
 from typing import Dict, List, Optional, TypedDict
@@ -18,10 +18,6 @@ class BotState(TypedDict, total=False):
 def load_memory(state: BotState) -> BotState:
     sid = state.get("session_id", "default")
     memory = get_memory(sid)
-
-    # Reset memory if it's a new session
-    if memory is None or not isinstance(memory, dict):
-        memory = {"symptoms": [], "duration": None, "triggers": None}
     state["memory"] = memory
     return state
 
@@ -29,19 +25,25 @@ def retrieve_chunks(state: BotState) -> BotState:
     session_id = state.get("session_id", "default")
     question = state["input"].lower()
 
+    # If summarization-type command, fetch full context
     if any(cmd in question for cmd in ["summarize", "summarise", "explain", "analyze", "extract"]):
         chunks = query_faiss(f"{session_id}.faiss")
-        state["docs"] = chunks
     else:
-        state["docs"] = query_faiss(question, index_name=f"{session_id}.faiss")
-    
+        chunks = query_faiss(question, index_name=f"{session_id}.faiss")
+
+    # Fallback to full doc text if no context found
+    if not chunks:
+        print("[Fallback] No vector results found. Using full doc context.")
+        chunks = query_faiss(f"{session_id}.faiss")
+
+    state["docs"] = chunks
     return state
 
 def query_llm(state: BotState) -> BotState:
     prompt = build_medical_prompt(
-        state["memory"]["symptoms"],
+        state["memory"].get("symptoms", []),
         state["input"],
-        state["docs"]
+        state.get("docs", [])
     )
     print("[Query LLM] Prompt:\n", prompt)
     state["response"] = query_ollama(prompt)
@@ -52,7 +54,7 @@ def decide_followup(state: BotState) -> BotState:
     missing = []
 
     if not mem.get("duration"):
-        missing.append("duration")   
+        missing.append("duration")
     if not mem.get("triggers"):
         missing.append("triggers")
 
@@ -68,25 +70,26 @@ def update_memory(state: BotState) -> BotState:
     text = state["input"]
     mem = state["memory"]
 
+    # Extract duration
     match = re.search(r"(for|since)\s+(\d+\s+\w+)", text.lower())
     if match:
         mem["duration"] = match.group(2)
 
+    # Detect triggers
     for word in ["walking", "running", "exercise", "cold", "dust"]:
         if word in text.lower():
             mem["triggers"] = word
             break
 
+    # Update symptoms
     if text not in mem["symptoms"]:
         mem["symptoms"].append(text)
 
-    # Save to Redis
-    save_memory(state.get("session_id", "default"), mem)
     state["memory"] = mem
     return state
 
 def build_medical_prompt(symptoms, input_text, docs):
-    doc_context = "\n".join(docs)
+    doc_context = "\n".join(docs) if docs else "No context found."
     known_symptoms = ', '.join(symptoms) if symptoms else 'None yet'
 
     return f"""
@@ -111,7 +114,7 @@ def build_medical_prompt(symptoms, input_text, docs):
         4. Never ask for symptoms unless you're sure the user hasn’t shared any and isn’t giving a task-oriented command.
 
         Only respond based on the user input and document context. Do not make up medical information.
-        """
+    """
 
 def build_graph() -> Runnable:
     graph = StateGraph(BotState)
@@ -123,8 +126,8 @@ def build_graph() -> Runnable:
 
     graph.set_entry_point("load_memory")
     graph.add_edge("load_memory", "retrieve")
-    graph.add_edge("retrieve", "update_memory")  
-    graph.add_edge("update_memory", "llm")     
-    # graph.add_edge("llm", "followup_logic")
+    graph.add_edge("retrieve", "update_memory")
+    graph.add_edge("update_memory", "llm")
+    graph.add_edge("llm", "followup_logic")
     graph.set_finish_point("followup_logic")
     return graph.compile()

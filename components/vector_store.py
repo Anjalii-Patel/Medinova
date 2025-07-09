@@ -57,3 +57,11 @@ def embed_chunks(chunks):
     model = SentenceTransformer("all-MiniLM-L6-v2")
     embeddings = model.encode(chunks, convert_to_numpy=True, show_progress_bar=False)
     return np.array(embeddings).astype("float32")
+
+def delete_faiss_index(index_name):
+    index_path = os.path.join(INDEX_FOLDER, index_name)
+    chunks_path = index_path + ".pkl"
+    if os.path.exists(index_path):
+        os.remove(index_path)
+    if os.path.exists(chunks_path):
+        os.remove(chunks_path)
