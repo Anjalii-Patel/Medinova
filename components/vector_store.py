@@ -65,3 +65,7 @@ def delete_faiss_index(index_name):
         os.remove(index_path)
     if os.path.exists(chunks_path):
         os.remove(chunks_path)
+
+def get_all_chunks(index_name="default.faiss"):
+    _, chunks = load_faiss_index(index_name)
+    return chunks

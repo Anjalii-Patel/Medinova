@@ -37,10 +37,10 @@ body {
   cursor: pointer;
   border-bottom: 1px solid #ccc;
 }
-
+/* 
 #sidebar div:hover {
   background-color: #e0e0e0;
-}
+} */
 
 #chat-container {
   flex: 1;
@@ -238,6 +238,71 @@ h1 {
   display: none;
   position: absolute;
   right: 6px;
-  color: red;
+  color: #2563eb;
   cursor: pointer;
 }
+
+.delete-chat i:hover {
+  color: #3b82f6;
+}
+
+/* Modal styles for chat deletion */
+#deleteChatModal {
+  display: none;
+  position: fixed;
+  z-index: 1000;
+  left: 0; top: 0; right: 0; bottom: 0;
+  justify-content: center;
+  align-items: center;
+  background: rgba(59,130,246,0.10); /* Use main blue with transparency */
+}
+#deleteChatModal .modal-overlay {
+  position: absolute;
+  left: 0; top: 0; right: 0; bottom: 0;
+  background: rgba(59,130,246,0.10); /* Use main blue with transparency */
+}
+#deleteChatModal .modal-content {
+  position: relative;
+  background: #fff; /* match main background */
+  color: #111827; /* match main text color */
+  border-radius: 10px;
+  padding: 2rem 2.5rem;
+  min-width: 320px;
+  box-shadow: 0 4px 32px rgba(59,130,246,0.15);
+  z-index: 1;
+  text-align: center;
+  border: 1px solid #3b82f6;
+}
+#deleteChatModal h3 {
+  margin-top: 0;
+  color: #ff4d4f;
+}
+#deleteChatModal .modal-actions {
+  margin-top: 1.5rem;
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+}
+#deleteChatModal .modal-btn {
+  padding: 0.5rem 1.5rem;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+#deleteChatModal .modal-btn.cancel {
+  background: #3b82f6;
+  color: #fff;
+}
+#deleteChatModal .modal-btn.cancel:hover {
+  background: #2563eb;
+}
+#deleteChatModal .modal-btn.delete {
+  background: #ff4d4f;
+  color: #fff;
+}
+#deleteChatModal .modal-btn.delete:hover {
+  background: #d9363e;
+}
+

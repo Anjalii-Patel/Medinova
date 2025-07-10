@@ -164,6 +164,35 @@ function toggleMic() {
 }
 
 // ===================== CHAT SESSIONS =====================
+// Custom modal for chat deletion
+function showDeleteChatModal(onConfirm) {
+  let modal = document.getElementById("deleteChatModal");
+  if (!modal) {
+    modal = document.createElement("div");
+    modal.id = "deleteChatModal";
+    modal.innerHTML = `
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <h3>Delete Chat</h3>
+        <p>Are you sure you want to delete this chat? This action cannot be undone.</p>
+        <div class="modal-actions">
+          <button id="modalCancelBtn" class="modal-btn cancel">Cancel</button>
+          <button id="modalDeleteBtn" class="modal-btn delete">Delete</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+  }
+  modal.style.display = "flex";
+  document.getElementById("modalCancelBtn").onclick = () => {
+    modal.style.display = "none";
+  };
+  document.getElementById("modalDeleteBtn").onclick = () => {
+    modal.style.display = "none";
+    onConfirm();
+  };
+}
+
 async function loadChatHistory() {
   try {
     const res = await fetch("/chats");
@@ -178,7 +207,7 @@ async function loadChatHistory() {
 
       const del = document.createElement("span");
       del.className = "delete-chat";
-      del.textContent = "❌";
+      del.innerHTML = '<i class="fas fa-trash"></i>';
       del.onclick = (e) => {
         e.stopPropagation();
         deleteChat(c.session_id);
@@ -192,11 +221,15 @@ async function loadChatHistory() {
 }
 
 async function deleteChat(id) {
-  const res = await fetch(`/delete_session/${id}`, { method: "DELETE" });
-  if (res.ok) {
-    if (id === sessionId) startNewChat();
-    await loadChatHistory();
-  }
+  showDeleteChatModal(async () => {
+    const formData = new FormData();
+    formData.append("session_id", id);
+    const res = await fetch(`/delete_session`, { method: "POST", body: formData });
+    if (res.ok) {
+      if (id === sessionId) startNewChat();
+      await loadChatHistory();
+    }
+  });
 }
 
 async function loadChat(id) {
@@ -209,7 +242,11 @@ async function loadChat(id) {
     const res = await fetch(`/chat/${sessionId}`);
     const d = await res.json();
 
-    d.messages.forEach(m => appendMessage(m.role, m.text));
+    if (d.messages.length === 0) {
+      appendMessage("bot", "New chat started. Ask your question!");
+    } else {
+      d.messages.forEach(m => appendMessage(m.role, m.text));
+    }
     await loadDocuments();
   } catch {
     console.error("Load chat failed");

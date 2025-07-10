@@ -15,7 +15,6 @@ def get_session_key(session_id: str) -> str:
 def get_memory(session_id: str):
     key = get_session_key(session_id)
     data = redis.get(key)
-
     if data:
         memory = json.loads(data)
         # Ensure required keys exist
@@ -28,8 +27,8 @@ def get_memory(session_id: str):
         memory.setdefault("uploaded_files", [])
         return memory
 
-    # New session
-    memory = {
+    # Do not create/save a new session unless a real message is added
+    return {
         "session_id": session_id,
         "created": str(datetime.now()),
         "symptoms": [],
@@ -38,53 +37,38 @@ def get_memory(session_id: str):
         "messages": [],
         "uploaded_files": []
     }
-    redis.set(key, json.dumps(memory))
-    return memory
 
 def save_memory(session_id: str, memory: dict):
     key = get_session_key(session_id)
-    redis.set(key, json.dumps(memory))
+    # Only save if there is at least one real message
+    if memory.get("messages"):
+        redis.set(key, json.dumps(memory))
+    else:
+        # If no messages, ensure session is not saved
+        redis.delete(key)
 
 def list_sessions():
     keys = redis.keys("session:*")
     sessions = []
-
     for key in sorted(keys):
         session = json.loads(redis.get(key))
-        preview = "No messages"
+        # Only include sessions with at least one real message
         if session.get("messages"):
+            preview = "No messages"
             for msg in session["messages"]:
                 if msg["role"] == "user":
                     preview = msg["text"]
                     break
-        sessions.append({
-            "session_id": session["session_id"],
-            "created": session.get("created"),
-            "preview": preview
-        })
+            sessions.append({
+                "session_id": session["session_id"],
+                "created": session.get("created"),
+                "preview": preview
+            })
     return sessions
 
 def delete_session(session_id: str):
     key = get_session_key(session_id)
     redis.delete(key)
-
-def get_memory(session_id: str):
-    key = get_session_key(session_id)
-    data = redis.get(key)
-    if data:
-        return json.loads(data)
-
-    memory = {
-        "session_id": session_id,
-        "created": str(datetime.now()),
-        "symptoms": [],
-        "duration": None,
-        "triggers": None,
-        "messages": [],
-        "documents": []
-    }
-    redis.set(key, json.dumps(memory))
-    return memory
 
 def delete_session(session_id: str):
     redis.delete(get_session_key(session_id))
