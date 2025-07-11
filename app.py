@@ -124,6 +124,13 @@ async def ask(question: str = Form(...), session_id: str = Form("default")):
     memory["messages"].append({"role": "bot", "text": response_text})
     save_memory(session_id, memory)
 
+    # --- Store user and bot messages in FAISS index (after response) ---
+    from components.vector_store import save_chat_message_embedding
+    save_chat_message_embedding(session_id, question)
+    print(f"[FAISS] Added user message to chat index: {question}")
+    save_chat_message_embedding(session_id, response_text)
+    print(f"[FAISS] Added bot message to chat index: {response_text}")
+
     return {
         "response": response_text,
         "followup": result.get("followup_required", False)
@@ -145,7 +152,9 @@ def get_chat(session_id: str):
 
 @app.post("/delete_session")
 def delete_chat(session_id: str = Form(...)):
+    from components.vector_store import delete_chat_faiss_index
     delete_session(session_id)
+    delete_chat_faiss_index(session_id)
     return {"status": "deleted"}
 
 @app.post("/transcribe")
