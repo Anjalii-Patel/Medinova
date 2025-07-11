@@ -59,10 +59,12 @@ async function loadDocuments() {
 }
 
 async function deleteDocument(docName) {
+  const formData = new FormData();
+  formData.append("session_id", sessionId);
+  formData.append("filename", docName); // must match backend param
   const res = await fetch(`/delete_doc`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ session_id: sessionId, doc_name: docName })
+    body: formData
   });
   if (res.ok) await loadDocuments();
 }
@@ -261,6 +263,7 @@ function startNewChat() {
   uploadedDocsContainer.innerHTML = "";
   appendMessage("bot", "New chat started. Ask your question!");
   loadChatHistory();
+  loadDocuments(); // <-- Ensure document list is refreshed
 }
 
 window.onload = () => {

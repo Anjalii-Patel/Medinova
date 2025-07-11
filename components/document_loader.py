@@ -3,6 +3,7 @@ import os
 import fitz
 import docx
 from typing import List
+from components.llm_ollama import query_ollama  # or your LLM function
 
 def load_pdf(file_path: str) -> str:
     text = ""
@@ -33,3 +34,27 @@ def chunk_text(text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]
         chunks.append(chunk)
         start += chunk_size - overlap
     return chunks
+
+def recursive_summarize(chunks, summarize_func, max_chunks_per_pass=8):
+    """
+    Recursively summarize a list of text chunks using the provided summarize_func.
+    summarize_func: function that takes a list of strings and returns a summary string.
+    max_chunks_per_pass: how many chunks to summarize at once (fits LLM context window).
+    """
+    if len(chunks) <= max_chunks_per_pass:
+        return summarize_func(chunks)
+    # Summarize in batches
+    summaries = []
+    for i in range(0, len(chunks), max_chunks_per_pass):
+        batch = chunks[i:i+max_chunks_per_pass]
+        summary = summarize_func(batch)
+        summaries.append(summary)
+    # Recursively summarize the summaries
+    return recursive_summarize(summaries, summarize_func, max_chunks_per_pass)
+
+def summarize_chunks_with_llm(chunks):
+    """
+    Summarize a list of text chunks using your LLM.
+    """
+    prompt = "\n\n".join(chunks) + "\n\nSummarize the above medical content in clear, concise bullet points."
+    return query_ollama(prompt)

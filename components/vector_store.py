@@ -68,4 +68,4 @@ def delete_faiss_index(index_name):
 
 def get_all_chunks(index_name="default.faiss"):
     _, chunks = load_faiss_index(index_name)
-    return chunks
+    return chunks 

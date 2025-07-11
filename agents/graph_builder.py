@@ -25,19 +25,21 @@ def retrieve_chunks(state: BotState) -> BotState:
     session_id = state.get("session_id", "default")
     question = state["input"].lower()
 
-    # If summarization-type command, fetch full context
+    # If summarization-type command, use recursive summarization
     if any(cmd in question for cmd in ["summarize", "summarise", "explain", "analyze", "extract"]):
-        chunks = query_faiss(question, index_name=f"{session_id}.faiss")
+        from components.document_loader import recursive_summarize, summarize_chunks_with_llm
+        all_chunks = get_all_chunks(f"{session_id}.faiss")
+        summary = recursive_summarize(all_chunks, summarize_chunks_with_llm, max_chunks_per_pass=8)
+        state["docs"] = [summary]
+        return state
     else:
         chunks = query_faiss(question, index_name=f"{session_id}.faiss")
-
-    # Fallback to full doc text if no context found
-    if not chunks:
-        print("[Fallback] No vector results found. Using full doc context.")
-        chunks = get_all_chunks(f"{session_id}.faiss")
-
-    state["docs"] = chunks
-    return state
+        # Fallback to full doc text if no context found
+        if not chunks:
+            # print("[Fallback] No vector results found. Using full doc context.")
+            chunks = get_all_chunks(f"{session_id}.faiss")
+        state["docs"] = chunks
+        return state
 
 def build_medical_prompt(input_text, docs):
     doc_context = "\n".join(docs) if docs else "No context found."
@@ -69,7 +71,7 @@ def query_llm(state: BotState) -> BotState:
         state["input"],
         state.get("docs", [])
     )
-    print("[Query LLM] Prompt:\n", prompt)
+    # print("[Query LLM] Prompt:\n", prompt)
     state["response"] = query_ollama(prompt)
     return state
 

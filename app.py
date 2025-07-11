@@ -72,8 +72,40 @@ def delete_document(session_id: str = Form(...), filename: str = Form(...)):
     if os.path.exists(file_path):
         os.remove(file_path)
 
-    # Delete FAISS index
-    delete_faiss_index(f"{session_id}.faiss")
+    # Remove only the deleted document's chunks from the FAISS index
+    from components.vector_store import load_faiss_index, embed_chunks, save_faiss_index
+    from components.document_loader import load_document, chunk_text
+    index_name = f"{session_id}.faiss"
+    index_path = os.path.join("vector_store", index_name)
+    chunks_path = index_path + ".pkl"
+    if os.path.exists(index_path) and os.path.exists(chunks_path):
+        # Load all chunks
+        import pickle
+        with open(chunks_path, "rb") as f:
+            all_chunks = pickle.load(f)
+        # Rebuild chunks for all remaining documents
+        memory = get_memory(session_id)
+        remaining_docs = [doc for doc in memory.get("documents", []) if doc != filename]
+        new_chunks = []
+        new_embeddings = []
+        from sentence_transformers import SentenceTransformer
+        model = SentenceTransformer("all-MiniLM-L6-v2")
+        for doc in remaining_docs:
+            doc_path = f"{UPLOAD_FOLDER}/{session_id}_{doc}"
+            if os.path.exists(doc_path):
+                text = load_document(doc_path)
+                doc_chunks = chunk_text(text)
+                if doc_chunks:
+                    new_chunks.extend(doc_chunks)
+                    new_embeddings.extend(model.encode(doc_chunks, convert_to_numpy=True, show_progress_bar=False))
+        if new_chunks and new_embeddings:
+            import numpy as np
+            new_embeddings = np.array(new_embeddings).astype("float32")
+            save_faiss_index(new_embeddings, new_chunks, index_name=index_name)
+        else:
+            # No docs left, delete index
+            from components.vector_store import delete_faiss_index
+            delete_faiss_index(index_name)
 
     # Remove from memory
     memory = get_memory(session_id)
@@ -130,3 +162,8 @@ async def websocket_asr_endpoint(websocket: WebSocket):
         await stream_asr(websocket)
     except WebSocketDisconnect:
         print("WebSocket disconnected")
+
+@app.get("/documents/{session_id}")
+def get_documents(session_id: str):
+    session = get_memory(session_id)
+    return session.get("documents", [])
