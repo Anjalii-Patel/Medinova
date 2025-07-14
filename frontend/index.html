@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
 </head>
 <body>
-
   <div id="sidebar">
+    <button id="sidebarToggle" class="icon-button" style="margin-bottom:10px;">☰</button>
     <button onclick="startNewChat()">+ New Chat</button>
     <div id="chatHistory"></div>
   </div>
@@ -46,5 +46,42 @@
   </div>
 
   <script src="/frontend/app.js"></script>
+  <script>
+    // Sidebar toggle logic
+    const sidebar = document.getElementById('sidebar');
+    const sidebarToggle = document.getElementById('sidebarToggle');
+    let sidebarOpen = true;
+    sidebarToggle.onclick = function() {
+      sidebarOpen = !sidebarOpen;
+      if (sidebarOpen) {
+        sidebar.style.display = 'block';
+        sidebarToggle.innerText = '☰';
+        document.getElementById('chat-container').style.marginLeft = '250px';
+      } else {
+        sidebar.style.display = 'none';
+        document.getElementById('chat-container').style.marginLeft = '0';
+        // Move toggle button outside so it's still visible
+        sidebarToggle.style.position = 'absolute';
+        sidebarToggle.style.left = '10px';
+        sidebarToggle.style.top = '10px';
+        sidebarToggle.innerText = '→';
+        document.body.appendChild(sidebarToggle);
+      }
+    };
+    // On load, ensure sidebar is visible and chat-container is shifted
+    window.addEventListener('DOMContentLoaded', () => {
+      sidebar.style.display = 'block';
+      document.getElementById('chat-container').style.marginLeft = '250px';
+      sidebarToggle.style.position = 'static';
+    });
+    // When sidebar is shown again, move toggle back inside
+    const observer = new MutationObserver(() => {
+      if (sidebar.style.display === 'block') {
+        sidebar.insertBefore(sidebarToggle, sidebar.firstChild);
+        sidebarToggle.style.position = 'static';
+      }
+    });
+    observer.observe(sidebar, { attributes: true, attributeFilter: ['style'] });
+  </script>
 </body>
 </html>
